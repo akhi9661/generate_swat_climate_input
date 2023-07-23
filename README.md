@@ -18,3 +18,15 @@ An index file is also created for each parameter. The generated weather files ca
 
 - Download the `swat_input.py` file and run it.
 
+---
+
+GUI Window
+
+![image](https://github.com/akhi9661/generate_swat_climate_input/assets/63473666/1405c624-16a6-4c18-98b7-350b31f7aac5)
+
+---
+
+## Known Issue
+The 'elevation' column in index files is set to -999 (missing). It will be resolved shortly.
+
+
