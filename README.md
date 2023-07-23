@@ -27,7 +27,6 @@ GUI Window
 ---
 
 ## Known Issue
-- When temperature is selected as the parameter, it is throwing 'Invalid Lat/Lon error'
-- The 'elevation' column in index files is set to -999 (missing). It will be resolved shortly.
+The 'elevation' column in index files is set to -999 (missing). It will be resolved shortly.
 
 
