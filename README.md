@@ -22,7 +22,7 @@ An index file is also created for each parameter. The generated weather files ca
 
 GUI Window
 
-![image](https://github.com/akhi9661/generate_swat_climate_input/assets/63473666/1405c624-16a6-4c18-98b7-350b31f7aac5)
+![image](https://github.com/akhi9661/generate_swat_climate_input/assets/63473666/ae249ff6-0e66-4727-a088-e3823bad916a)
 
 ---
 
