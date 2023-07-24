@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8180294.svg)](https://doi.org/10.5281/zenodo.8180294)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![NASA POWER LARC](https://img.shields.io/badge/NASA_POWER_LARC-blue)](https://power.larc.nasa.gov/data-access-viewer/)
 [![SWAT](https://img.shields.io/badge/SWAT-gray)](https://swat.tamu.edu/)
