@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext, filedialog
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 import tkintermapview
 from tkcalendar import DateEntry
 from datetime import datetime
@@ -20,7 +20,7 @@ def create_regular_grid(min_lat, min_lon, max_lat, max_lon, step=0.5):
         lat -= step
     return grid_points
 
-def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'daily', 
+def download_param(bounding_box, param = 'PRECTOTCORR', community = 'AG', temporal = 'daily', 
                    start_date = '20150101', end_date = '20150331', dest_folder = os.getcwd()):
     
     # Ref: https://power.larc.nasa.gov/#resources
@@ -38,6 +38,8 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
     # Initialize the index data
     index_data = [['ID', 'NAME', 'LAT', 'LONG', 'ELEVATION']]
     idx = 1
+    
+    old_message = status_label.get("1.0", tk.END)
 
     if param == 'T2M':
         # Download T2M_MAX data
@@ -45,20 +47,28 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
         for latitude, longitude in locations:
             url = f'https://power.larc.nasa.gov/api/temporal/{temporal}/point?'
             url += f'parameters=T2M_MAX&community={community}&longitude={longitude}&latitude={latitude}&start={start_date}&end={end_date}&format=JSON'
-            print(f'Downloading "T2M_MAX" [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
             response = requests.get(url=url, verify=True, timeout=30.00)
             content = json.loads(response.content.decode('utf-8'))
             properties = content['properties']['parameter']['T2M_MAX']
             data_dict_max[(latitude, longitude)] = properties
+            progress_percent = (n / len(locations)) * 100
+            status_text = f'{old_message}Downloading "T2M_MAX" [{(latitude, longitude)}]: {progress_percent:.2f}%'
+            status_label.delete(1.0, tk.END)
+            status_label.insert(tk.END, status_text)
+            status_label.see(tk.END)
+            status_label.update_idletasks()
             
             # Prepare data for the index file
-            filename = f"T2M{latitude}{longitude}".replace(".", "")
+            filename = f"T2M{str(latitude)}{str(longitude)}".replace(".", "")
             elevation = -999.000  # Use -999.000 as a constant value for elevation
             index_data.append([idx, filename, latitude, longitude, elevation])
             idx += 1
             
             n += 1
 
+        status_label.insert(tk.END, '\nDownload complete!\n')
+        status_label.see(tk.END)
+        status_label.update()
         df_max = pd.DataFrame.from_dict(data_dict_max, orient='index')
         df_max = df_max.transpose()
 
@@ -66,15 +76,23 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
         data_dict_min = {}
         n = 1
         for latitude, longitude in locations:
-            url = f'https://power.larc.nasa.gov/api/temporal/daily/point?'
+            url = f'https://power.larc.nasa.gov/api/temporal/{temporal}/point?'
             url += f'parameters=T2M_MIN&community={community}&longitude={longitude}&latitude={latitude}&start={start_date}&end={end_date}&format=JSON'
-            print(f'Downloading "T2M_MIN" [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
             response = requests.get(url=url, verify=True, timeout=30.00)
             content = json.loads(response.content.decode('utf-8'))
             properties = content['properties']['parameter']['T2M_MIN']
             data_dict_min[(latitude, longitude)] = properties
+            progress_percent = (n / len(locations)) * 100
+            status_text = f'{old_message}Downloading "T2M_MIN" [{(latitude, longitude)}]: {progress_percent:.2f}%'
+            status_label.delete(1.0, tk.END)
+            status_label.insert(tk.END, status_text)
+            status_label.see(tk.END)
+            status_label.update_idletasks()
             n += 1
 
+        status_label.insert(tk.END, '\nDownload complete!\n')
+        status_label.see(tk.END)
+        status_label.update()
         df_min = pd.DataFrame.from_dict(data_dict_min, orient='index')
         df_min = df_min.transpose()
         
@@ -96,13 +114,19 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
     else:
         data_dict = {}
         for latitude, longitude in locations:
-            url = f'https://power.larc.nasa.gov/api/temporal/daily/point?'
+            url = f'https://power.larc.nasa.gov/api/temporal/{temporal}/point?'
             url += f'parameters={param}&community={community}&longitude={longitude}&latitude={latitude}&start={start_date}&end={end_date}&format=JSON'
-            print(f'Downloading [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
+            #print(f'Downloading [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
             response = requests.get(url=url, verify=True, timeout=30.00)
             content = json.loads(response.content.decode('utf-8'))
             properties = content['properties']['parameter'][param]
             data_dict[(latitude, longitude)] = properties
+            progress_percent = (n / len(locations)) * 100
+            status_text = f'{old_message}Downloading [{(latitude, longitude)}]: {progress_percent:.2f}%'
+            status_label.delete(1.0, tk.END)
+            status_label.insert(tk.END, status_text)
+            status_label.see(tk.END)
+            status_label.update_idletasks()
             
             # Prepare data for the index file
             filename = f"{param}{str(latitude)}{str(longitude)}".replace(".", "")
@@ -111,7 +135,10 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
             idx += 1
             
             n += 1
-            
+        
+        status_label.insert(tk.END, '\nDownload complete!\n')
+        status_label.see(tk.END)
+        status_label.update()
         df = pd.DataFrame.from_dict(data_dict, orient='index')
         df = df.transpose()
         df.columns = [f"{param}{str(lat)}{str(lon)}".replace(".", "") for lat, lon in locations]
@@ -147,7 +174,6 @@ def on_menu_selected(event, event_type):
 
     if event_type in event_type_messages:
         event_label = event_type_messages[event_type]
-        print(f"{event_label} selected: {selected_task}")
 
         status_label.insert(tk.END, f'{event_label}: {selected_task}\n')
         status_label.see(tk.END)
@@ -182,7 +208,6 @@ def on_date_selected(event, date_type):
 
     if date_type in date_type_messages:
         date_label = date_type_messages[date_type]
-        print(f"{date_label} selected: {selected_date}")
 
         status_label.insert(tk.END, f'{date_label}: {selected_date}\n')
         status_label.see(tk.END)
@@ -214,20 +239,19 @@ def fetch_power_data():
             (bottom_left_lat, upper_right_lon),  # Bottom-Right
             (bottom_left_lat, bottom_left_lon)   # Bottom-Left
         ]
-        
-        status_label.insert(tk.END, f'Bounding Box: {bounding_box}')
-        status_label.see(tk.END)
-        status_label.update()
+    
         
         polygon = map_widget.set_polygon(bounding_box, fill_color=None, outline_color="red", border_width=2,
-                                         command=polygon_click,
+                                         command=lambda:polygon_click(),
                                          name="Bounding Box")
         
         # first coordinate is the top-left corner and the second coordinate is the bottom-right corner
         map_widget.fit_bounding_box(bounding_box[0], bounding_box[2])
         
-        # Getting other variables
-
+        status_label.insert(tk.END, f'Bounding Box: {bounding_box}')
+        status_label.see(tk.END)
+        status_label.update()
+        
         # Mapping of task_var options to parameters
         task_to_param = {
             'Precipitation': 'PRECTOTCORR',
@@ -244,17 +268,18 @@ def fetch_power_data():
 
         param = task_to_param.get(task_var.get(), None)
         community = com_to_community.get(com_var.get(), None)
-            
+
         temporal = time_var.get()
+        temporal = temporal.lower()
         dest_folder = dest_fol_entry.get()
-        
+
         start_date = convert_date_format(date_str = start_date_entry.get())
         end_date = convert_date_format(date_str = end_date_entry.get())
-        
-        df = download_param(bbox, param, community, temporal, start_date, end_date, dest_folder)
 
+        df = download_param(bbox, param, community, temporal, start_date, end_date, dest_folder)
+        
     except ValueError:
-        print("Invalid input. Please enter valid numeric values for latitude and longitude.")
+        messagebox.showerror('Error', "Invalid input. Please enter valid numeric values for latitude and longitude.")
 
 # Create a frame for the inputs
 input_frame = ttk.LabelFrame(main_window, text="Data Inputs")
@@ -405,7 +430,7 @@ attribution_frame.grid(row = 0, column = 2, padx=10, pady=10)
 
 # Attribution label
 attribution_label = tk.Label(
-    attribution_frame, text=attribution_text, justify='left', wraplength=270, font=('Arial', 8))
+    attribution_frame, text=attribution_text, justify='left', wraplength=270, font=('Arial', 9))
 attribution_label.grid(padx=5, pady=5)
 
 main_window.mainloop()
