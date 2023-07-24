@@ -388,6 +388,26 @@ separator.grid(row=1, column=0, columnspan=2, pady=10, sticky='ew')
 status_label = scrolledtext.ScrolledText(map_label, width=80, height=5)
 status_label.grid(row = 2, columnspan = 2, sticky = 'news')
 
+# ----- Attribution text -----------
+attribution_text = (
+    "Disclaimer:\n\n"
+    "The boundaries of countries and territories shown on the map do not imply any judgment on the legal status of these regions or endorsement or acceptance of such boundaries.\n\n"
+    "I do not claim responsibility for the accuracy, completeness, or reliability of the map or weather data or any errors or omissions that may occur. Users are advised to verify the information independently and exercise their own judgment when using the map or the derived weather data.\n\n"
+    "The map and data is provided \"as is\" without any representations or warranties, express or implied. By using this map or any derived data, you agree that I shall not be liable for any damages, losses, or liabilities arising from the use of this map or reliance on the information displayed/derived.\n\n"
+    "For the most current and accurate information, users are encouraged to refer to official sources and seek professional advice when needed.\n\n"
+    "Provided under MIT License\n\n"
+    "Created by: Akhilesh Kumar\n(https://github.com/akhi9661/generate_swat_climate_input)"
+)
+
+# Frame for attribution
+attribution_frame = tk.Frame(main_window, width=800, height=20, bd=1, relief='solid')
+attribution_frame.grid(row = 0, column = 2, padx=10, pady=10)
+
+# Attribution label
+attribution_label = tk.Label(
+    attribution_frame, text=attribution_text, justify='left', wraplength=270, font=('Arial', 8))
+attribution_label.grid(padx=5, pady=5)
+
 main_window.mainloop()
 
 # ---------------------------------------------------------------------------------------------- #
