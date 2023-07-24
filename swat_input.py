@@ -9,6 +9,23 @@ import json
 import requests
 import pandas as pd
 
+import ee
+
+def get_elevation(latitude, longitude):
+    
+    if not ee.data._credentials:
+        ee.Authenticate()
+    if not ee.data._initialized:
+        ee.Initialize()
+        
+    point = ee.Geometry.Point([longitude, latitude])
+    srtm = ee.Image("USGS/SRTMGL1_003")
+    elevation = srtm.reduceRegion(reducer=ee.Reducer.first(), geometry=point)
+    dem_value = elevation.get('elevation')
+    dem_value_float = float(dem_value.getInfo())
+
+    return dem_value_float
+
 def create_regular_grid(min_lat, min_lon, max_lat, max_lon, step=0.5):
     grid_points = []
     lat = max_lat
@@ -45,6 +62,7 @@ def download_param(bounding_box, param = 'PRECTOTCORR', community = 'AG', tempor
         # Download T2M_MAX data
         data_dict_max = {}
         for latitude, longitude in locations:
+            elevation = get_elevation(latitude, longitude)
             url = f'https://power.larc.nasa.gov/api/temporal/{temporal}/point?'
             url += f'parameters=T2M_MAX&community={community}&longitude={longitude}&latitude={latitude}&start={start_date}&end={end_date}&format=JSON'
             response = requests.get(url=url, verify=True, timeout=30.00)
@@ -60,7 +78,6 @@ def download_param(bounding_box, param = 'PRECTOTCORR', community = 'AG', tempor
             
             # Prepare data for the index file
             filename = f"T2M{str(latitude)}{str(longitude)}".replace(".", "")
-            elevation = -999.000  # Use -999.000 as a constant value for elevation
             index_data.append([idx, filename, latitude, longitude, elevation])
             idx += 1
             
@@ -114,8 +131,10 @@ def download_param(bounding_box, param = 'PRECTOTCORR', community = 'AG', tempor
     else:
         data_dict = {}
         for latitude, longitude in locations:
+            elevation = get_elevation(latitude, longitude)
             url = f'https://power.larc.nasa.gov/api/temporal/{temporal}/point?'
             url += f'parameters={param}&community={community}&longitude={longitude}&latitude={latitude}&start={start_date}&end={end_date}&format=JSON'
+            url += f''
             #print(f'Downloading [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
             response = requests.get(url=url, verify=True, timeout=30.00)
             content = json.loads(response.content.decode('utf-8'))
@@ -130,7 +149,6 @@ def download_param(bounding_box, param = 'PRECTOTCORR', community = 'AG', tempor
             
             # Prepare data for the index file
             filename = f"{param}{str(latitude)}{str(longitude)}".replace(".", "")
-            elevation = -999.000  # Use -999.000 as a constant value for elevation
             index_data.append([idx, filename, latitude, longitude, elevation])
             idx += 1
             
