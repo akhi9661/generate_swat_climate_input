@@ -207,8 +207,7 @@ task_list = ["Select Parameter",
              "Temperature",
              "Wind",
              "Solar Radiation",
-             "Relative Humidity",
-             "About"]
+             "Relative Humidity"]
     
 # Function to handle date selection
 def on_date_selected(event, date_type):
