@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext, filedialog
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 import tkintermapview
 from tkcalendar import DateEntry
 from datetime import datetime
@@ -9,7 +9,53 @@ import json
 import requests
 import pandas as pd
 
+import ee
+
+def get_elevation(latitude, longitude):
+
+    '''
+    This function returns the elevation of a given latitude and longitude using the Google Earth Engine API. 
+
+    Parameters:
+        latitude (float): The latitude of the location
+        longitude (float): The longitude of the location
+
+    Returns:
+        dem_value_float (float): The elevation of the location
+
+    '''
+    
+    if not ee.data._credentials:
+        ee.Authenticate()
+    if not ee.data._initialized:
+        ee.Initialize()
+        
+    point = ee.Geometry.Point([longitude, latitude])
+    srtm = ee.Image("USGS/SRTMGL1_003")
+    elevation = srtm.reduceRegion(reducer=ee.Reducer.first(), geometry=point)
+    dem_value = elevation.get('elevation')
+    dem_value_float = float(dem_value.getInfo())
+
+    return dem_value_float
+
 def create_regular_grid(min_lat, min_lon, max_lat, max_lon, step=0.5):
+
+    '''
+    This function creates a regular grid of points within a given bounding box. 
+    The units of the bounding box and step size are in degrees.
+
+    Parameters:
+        min_lat (float): The minimum latitude of the bounding box
+        min_lon (float): The minimum longitude of the bounding box
+        max_lat (float): The maximum latitude of the bounding box
+        max_lon (float): The maximum longitude of the bounding box
+        step (float): The step size for the grid. Default is 0.5
+
+    Returns:
+        grid_points (list): A list of tuples containing the latitude and longitude of the grid points
+
+    '''
+
     grid_points = []
     lat = max_lat
     while lat >= min_lat:
@@ -20,8 +66,26 @@ def create_regular_grid(min_lat, min_lon, max_lat, max_lon, step=0.5):
         lat -= step
     return grid_points
 
-def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'daily', 
+def download_param(bounding_box, param = 'PRECTOTCORR', community = 'AG', temporal = 'daily', 
                    start_date = '20150101', end_date = '20150331', dest_folder = os.getcwd()):
+    
+    '''
+    This function downloads the data for a given parameter from the NASA POWER API. 
+    The data is downloaded for a given bounding box and time period. 
+
+    Parameters:
+        bounding_box (list): A list containing the minimum and maximum latitude and longitude of the bounding box
+        param (str): The parameter to download. Default is 'PRECTOTCORR'. Other options are 'T2M_MAX', 'T2M_MIN', 'RH2M', 'WS2M', 'ALLSKY_SFC_SW_DWN'
+        community (str): The community to download the data from. Default is 'AG'. Other options are 'RE', 'SB'
+        temporal (str): The temporal resolution of the data. Default is 'daily'. Other options are 'monthly', 'climatology'
+        start_date (str): The start date of the data in YYYYMMDD format. Default is '20150101'. Format is YYYYMMDD. 
+        end_date (str): The end date of the data in YYYYMMDD format. Default is '20150331'. Format is YYYYMMDD.
+        dest_folder (str): The destination folder to save the data. Default is the current working directory
+
+    Returns:
+        df (pandas.DataFrame): A pandas dataframe containing the downloaded data
+
+    '''
     
     # Ref: https://power.larc.nasa.gov/#resources
     # param: ['T2M_MAX', 'T2M_MIN', 'RH2M', 'PRECTOTCORR', 'WS2M', 'ALLSKY_SFC_SW_DWN']
@@ -38,27 +102,37 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
     # Initialize the index data
     index_data = [['ID', 'NAME', 'LAT', 'LONG', 'ELEVATION']]
     idx = 1
+    
+    old_message = status_label.get("1.0", tk.END)
 
     if param == 'T2M':
         # Download T2M_MAX data
         data_dict_max = {}
         for latitude, longitude in locations:
+            elevation = get_elevation(latitude, longitude)
             url = f'https://power.larc.nasa.gov/api/temporal/{temporal}/point?'
             url += f'parameters=T2M_MAX&community={community}&longitude={longitude}&latitude={latitude}&start={start_date}&end={end_date}&format=JSON'
-            print(f'Downloading "T2M_MAX" [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
             response = requests.get(url=url, verify=True, timeout=30.00)
             content = json.loads(response.content.decode('utf-8'))
             properties = content['properties']['parameter']['T2M_MAX']
             data_dict_max[(latitude, longitude)] = properties
+            progress_percent = (n / len(locations)) * 100
+            status_text = f'{old_message}Downloading "T2M_MAX" [{(latitude, longitude)}]: {progress_percent:.2f}%'
+            status_label.delete(1.0, tk.END)
+            status_label.insert(tk.END, status_text)
+            status_label.see(tk.END)
+            status_label.update_idletasks()
             
             # Prepare data for the index file
-            filename = f"T2M{latitude}{longitude}".replace(".", "")
-            elevation = -999.000  # Use -999.000 as a constant value for elevation
+            filename = f"T2M{str(latitude)}{str(longitude)}".replace(".", "")
             index_data.append([idx, filename, latitude, longitude, elevation])
             idx += 1
             
             n += 1
 
+        status_label.insert(tk.END, '\nDownload complete!\n')
+        status_label.see(tk.END)
+        status_label.update()
         df_max = pd.DataFrame.from_dict(data_dict_max, orient='index')
         df_max = df_max.transpose()
 
@@ -66,15 +140,23 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
         data_dict_min = {}
         n = 1
         for latitude, longitude in locations:
-            url = f'https://power.larc.nasa.gov/api/temporal/daily/point?'
+            url = f'https://power.larc.nasa.gov/api/temporal/{temporal}/point?'
             url += f'parameters=T2M_MIN&community={community}&longitude={longitude}&latitude={latitude}&start={start_date}&end={end_date}&format=JSON'
-            print(f'Downloading "T2M_MIN" [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
             response = requests.get(url=url, verify=True, timeout=30.00)
             content = json.loads(response.content.decode('utf-8'))
             properties = content['properties']['parameter']['T2M_MIN']
             data_dict_min[(latitude, longitude)] = properties
+            progress_percent = (n / len(locations)) * 100
+            status_text = f'{old_message}Downloading "T2M_MIN" [{(latitude, longitude)}]: {progress_percent:.2f}%'
+            status_label.delete(1.0, tk.END)
+            status_label.insert(tk.END, status_text)
+            status_label.see(tk.END)
+            status_label.update_idletasks()
             n += 1
 
+        status_label.insert(tk.END, '\nDownload complete!\n')
+        status_label.see(tk.END)
+        status_label.update()
         df_min = pd.DataFrame.from_dict(data_dict_min, orient='index')
         df_min = df_min.transpose()
         
@@ -96,22 +178,32 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
     else:
         data_dict = {}
         for latitude, longitude in locations:
-            url = f'https://power.larc.nasa.gov/api/temporal/daily/point?'
+            elevation = get_elevation(latitude, longitude)
+            url = f'https://power.larc.nasa.gov/api/temporal/{temporal}/point?'
             url += f'parameters={param}&community={community}&longitude={longitude}&latitude={latitude}&start={start_date}&end={end_date}&format=JSON'
-            print(f'Downloading [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
+            url += f''
+            #print(f'Downloading [{(latitude, longitude)}]: {(n/len(locations))*100:.2f}%', end='\r')
             response = requests.get(url=url, verify=True, timeout=30.00)
             content = json.loads(response.content.decode('utf-8'))
             properties = content['properties']['parameter'][param]
             data_dict[(latitude, longitude)] = properties
+            progress_percent = (n / len(locations)) * 100
+            status_text = f'{old_message}Downloading [{(latitude, longitude)}]: {progress_percent:.2f}%'
+            status_label.delete(1.0, tk.END)
+            status_label.insert(tk.END, status_text)
+            status_label.see(tk.END)
+            status_label.update_idletasks()
             
             # Prepare data for the index file
             filename = f"{param}{str(latitude)}{str(longitude)}".replace(".", "")
-            elevation = -999.000  # Use -999.000 as a constant value for elevation
             index_data.append([idx, filename, latitude, longitude, elevation])
             idx += 1
             
             n += 1
-            
+        
+        status_label.insert(tk.END, '\nDownload complete!\n')
+        status_label.see(tk.END)
+        status_label.update()
         df = pd.DataFrame.from_dict(data_dict, orient='index')
         df = df.transpose()
         df.columns = [f"{param}{str(lat)}{str(lon)}".replace(".", "") for lat, lon in locations]
@@ -133,11 +225,29 @@ def download_param(bounding_box, param = 'T2M', community = 'AG', temporal = 'da
     return df
     
 def browse_dest_ee_folder():
+
+    '''
+    This function is called when the user clicks the "Browse" button next to the "Destination folder" entry box.
+    It opens a file dialog box to allow the user to select a folder.
+
+    '''
+
     dest_folder = filedialog.askdirectory()
     dest_fol_entry.delete(0, tk.END)
     dest_fol_entry.insert(0, dest_folder)
 
 def on_menu_selected(event, event_type):
+
+    '''
+    This function is called when the user selects an item from the comboboxes. It displays the selected item in the status label.
+
+    Parameters: 
+        event (event): The event that called this function
+        event_type (str): The type of event that called this function
+
+    '''
+
+
     selected_task = event.widget.get()
     event_type_messages = {
         "param": "Parameter",
@@ -147,7 +257,6 @@ def on_menu_selected(event, event_type):
 
     if event_type in event_type_messages:
         event_label = event_type_messages[event_type]
-        print(f"{event_label} selected: {selected_task}")
 
         status_label.insert(tk.END, f'{event_label}: {selected_task}\n')
         status_label.see(tk.END)
@@ -163,11 +272,19 @@ task_list = ["Select Parameter",
              "Temperature",
              "Wind",
              "Solar Radiation",
-             "Relative Humidity",
-             "About"]
+             "Relative Humidity"]
     
 # Function to handle date selection
 def on_date_selected(event, date_type):
+
+    '''
+    This function is called when the user selects a date from the calendar. It displays the selected date in the status label.
+
+    Parameters:
+        event (event): The event that called this function
+        date_type (str): The type of date that was selected
+    '''
+
     if date_type == "temporal":
         selected_date = event.widget.get()
     else:
@@ -182,7 +299,6 @@ def on_date_selected(event, date_type):
 
     if date_type in date_type_messages:
         date_label = date_type_messages[date_type]
-        print(f"{date_label} selected: {selected_date}")
 
         status_label.insert(tk.END, f'{date_label}: {selected_date}\n')
         status_label.see(tk.END)
@@ -192,12 +308,30 @@ def polygon_click(polygon):
     print(f"polygon clicked - text: {polygon.name}")
     
 def convert_date_format(date_str):
+
+    '''
+    This function converts a date string from the format DD-MM-YYYY to YYYYMMDD.
+
+    Parameters:
+        date_str (str): The date string to be converted
+
+    Returns:
+        formatted_date (str): The date string in the format YYYYMMDD
+
+    '''
+
     date_obj = datetime.strptime(date_str, '%d-%m-%Y')
     formatted_date = date_obj.strftime('%Y%m%d')
     return formatted_date
     
 # Function to handle fetching power data and creating a bounding box
 def fetch_power_data():
+
+    '''
+    This function is called when the user clicks the "Fetch Power Data" button. 
+    It fetches the power data from the API and creates a bounding box on the map widget. 
+    '''
+
     try:
         # Get the entered values for latitude and longitude
         bottom_left_lat = float(bottom_left_lat_entry.get())
@@ -214,20 +348,19 @@ def fetch_power_data():
             (bottom_left_lat, upper_right_lon),  # Bottom-Right
             (bottom_left_lat, bottom_left_lon)   # Bottom-Left
         ]
-        
-        status_label.insert(tk.END, f'Bounding Box: {bounding_box}')
-        status_label.see(tk.END)
-        status_label.update()
+    
         
         polygon = map_widget.set_polygon(bounding_box, fill_color=None, outline_color="red", border_width=2,
-                                         command=polygon_click,
+                                         command=lambda:polygon_click(),
                                          name="Bounding Box")
         
         # first coordinate is the top-left corner and the second coordinate is the bottom-right corner
         map_widget.fit_bounding_box(bounding_box[0], bounding_box[2])
         
-        # Getting other variables
-
+        status_label.insert(tk.END, f'Bounding Box: {bounding_box}')
+        status_label.see(tk.END)
+        status_label.update()
+        
         # Mapping of task_var options to parameters
         task_to_param = {
             'Precipitation': 'PRECTOTCORR',
@@ -244,17 +377,18 @@ def fetch_power_data():
 
         param = task_to_param.get(task_var.get(), None)
         community = com_to_community.get(com_var.get(), None)
-            
+
         temporal = time_var.get()
+        temporal = temporal.lower()
         dest_folder = dest_fol_entry.get()
-        
+
         start_date = convert_date_format(date_str = start_date_entry.get())
         end_date = convert_date_format(date_str = end_date_entry.get())
-        
-        df = download_param(bbox, param, community, temporal, start_date, end_date, dest_folder)
 
+        df = download_param(bbox, param, community, temporal, start_date, end_date, dest_folder)
+        
     except ValueError:
-        print("Invalid input. Please enter valid numeric values for latitude and longitude.")
+        messagebox.showerror('Error', "Invalid input. Please enter valid inputs.")
 
 # Create a frame for the inputs
 input_frame = ttk.LabelFrame(main_window, text="Data Inputs")
@@ -387,6 +521,26 @@ separator.grid(row=1, column=0, columnspan=2, pady=10, sticky='ew')
 
 status_label = scrolledtext.ScrolledText(map_label, width=80, height=5)
 status_label.grid(row = 2, columnspan = 2, sticky = 'news')
+
+# ----- Attribution text -----------
+attribution_text = (
+    "Disclaimer:\n\n"
+    "The boundaries of countries and territories shown on the map do not imply any judgment on the legal status of these regions or endorsement or acceptance of such boundaries.\n\n"
+    "I do not claim responsibility for the accuracy, completeness, or reliability of the map or weather data or any errors or omissions that may occur. Users are advised to verify the information independently and exercise their own judgment when using the map or the derived weather data.\n\n"
+    "The map and data is provided \"as is\" without any representations or warranties, express or implied. By using this map or any derived data, you agree that I shall not be liable for any damages, losses, or liabilities arising from the use of this map or reliance on the information displayed/derived.\n\n"
+    "For the most current and accurate information, users are encouraged to refer to official sources and seek professional advice when needed.\n\n"
+    "Provided under MIT License\n\n"
+    "Created by: Akhilesh Kumar\n(https://github.com/akhi9661/generate_swat_climate_input)"
+)
+
+# Frame for attribution
+attribution_frame = tk.Frame(main_window, width=800, height=20, bd=1, relief='solid')
+attribution_frame.grid(row = 0, column = 2, padx=10, pady=10)
+
+# Attribution label
+attribution_label = tk.Label(
+    attribution_frame, text=attribution_text, justify='left', wraplength=270, font=('Arial', 9))
+attribution_label.grid(padx=5, pady=5)
 
 main_window.mainloop()
 
