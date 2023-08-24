@@ -12,7 +12,6 @@ import pandas as pd
 import ee
 
 def get_elevation(latitude, longitude):
-<<<<<<< HEAD
 
     '''
     This function returns the elevation of a given latitude and longitude using the Google Earth Engine API. 
@@ -25,8 +24,6 @@ def get_elevation(latitude, longitude):
         dem_value_float (float): The elevation of the location
 
     '''
-=======
->>>>>>> 8253f451113b639b53cc74d19c6965ad5bfad589
     
     if not ee.data._credentials:
         ee.Authenticate()
@@ -391,11 +388,7 @@ def fetch_power_data():
         df = download_param(bbox, param, community, temporal, start_date, end_date, dest_folder)
         
     except ValueError:
-<<<<<<< HEAD
         messagebox.showerror('Error', "Invalid input. Please enter valid inputs.")
-=======
-        messagebox.showerror('Error', "Invalid input. Please enter valid numeric values for latitude and longitude.")
->>>>>>> 8253f451113b639b53cc74d19c6965ad5bfad589
 
 # Create a frame for the inputs
 input_frame = ttk.LabelFrame(main_window, text="Data Inputs")
