@@ -21,7 +21,9 @@ The elevation information is extracted from [SRTM 30m DEM](https://developers.go
 
 - Download the `swat_input.py` file and run it.
  
-- If running it for the first time, GEE authentication will have to be done as well. An authentication window will open and it will redirect you to your gmail account. For repeated runs, unless the application is restarted, GEE authentication will likely won't be required again. 
+- If running it for the first time, GEE authentication will have to be done as well. An authentication window will open and it will redirect you to your gmail account. For repeated runs, unless the application is restarted, GEE authentication will likely won't be required again.
+
+Note: If another IDE except Jupyter/Collab is used, then `gcloud` installation is necessary. [Refer here for more.](https://cloud.google.com/sdk/docs/install)
 
 ---
 
